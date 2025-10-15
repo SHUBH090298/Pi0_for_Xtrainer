@@ -453,6 +453,65 @@ class LeRobotDROIDDataConfig(DataConfigFactory):
         )
 
 
+@dataclasses.dataclass(frozen=True)  
+class XtrainerDataConfig(DataConfigFactory):  
+    """Config for your custom ALOHA-like robot with 14-dim actions."""  
+      
+    use_delta_joint_actions: bool = True  
+    default_prompt: str | None = None  
+      
+    # Map your LeRobot dataset keys to model input keys  
+    repack_transforms: tyro.conf.Suppress[_transforms.Group] = dataclasses.field(  
+        default=_transforms.Group(  
+            inputs=[  
+                _transforms.RepackTransform(  
+                    {  
+                        "images": {  
+                            "top": "observation.images.top",  
+                            "left_wrist": "observation.images.left_wrist",  
+                            "right_wrist": "observation.images.right_wrist",  
+                        },  
+                        "state": "observation.state",  
+                        "actions": "action",  
+                    }  
+                )  
+            ]  
+        )  
+    )  
+      
+    action_sequence_keys: Sequence[str] = ("action",)  
+      
+    @override  
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:  
+        # Import your custom policy classes  
+        import openpi.policies.Xtrainer_policy as Xtrainer_policy  
+          
+        data_transforms = _transforms.Group(  
+            inputs=[Xtrainer_policy.XtrainerInputs()],  
+            outputs=[Xtrainer_policy.XtrainerOutputs()],  
+        )  
+          
+        # Configure delta actions for joints, absolute for gripper  
+        if self.use_delta_joint_actions:  
+            # Adjust mask for your 14-dim action space  
+            # Assuming 6 joints + 1 gripper per arm = [True]*6 + [False] + [True]*6 + [False]  
+            # This gives 14 dimensions total  
+            delta_action_mask = _transforms.make_bool_mask(6, -1, 6, -1)  
+            data_transforms = data_transforms.push(  
+                inputs=[_transforms.DeltaActions(delta_action_mask)],  
+                outputs=[_transforms.AbsoluteActions(delta_action_mask)],  
+            )  
+          
+        model_transforms = ModelTransformFactory(default_prompt=self.default_prompt)(model_config)  
+          
+        return dataclasses.replace(  
+            self.create_base_config(assets_dirs, model_config),  
+            repack_transforms=self.repack_transforms,  
+            data_transforms=data_transforms,  
+            model_transforms=model_transforms,  
+            action_sequence_keys=self.action_sequence_keys,  
+        )
+
 @dataclasses.dataclass(frozen=True)
 class TrainConfig:
     # Name of the config. Must be unique. Will be used to reference this config.
@@ -552,6 +611,19 @@ _CONFIGS = [
     #
     # Inference Aloha configs.
     #
+    TrainConfig(  
+    name="pi0_xtrainer",  
+    model=pi0_config.Pi0Config(),  
+    data=XtrainerDataConfig(  
+        repo_id="Shubh0902/Pick_Place1",  # Replace with your HuggingFace dataset  
+        # Compute fresh normalization stats for your 14-dim action space  
+        # Don't reload existing stats since your action dimension differs from standard ALOHA  
+        default_prompt="pick and place",  # Optional: your default task instruction  
+    ),  
+    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),  
+    num_train_steps=20_000,  
+    batch_size=32,  
+),
     TrainConfig(
         name="pi0_aloha",
         model=pi0_config.Pi0Config(),
