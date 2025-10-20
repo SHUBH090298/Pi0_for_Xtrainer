@@ -46,12 +46,20 @@ class CheckpointWeightLoader(WeightLoader):
     """
 
     params_path: str
+    skip_regex: str | None = None 
 
-    def load(self, params: at.Params) -> at.Params:
-        # We are loading np.ndarray and relying on the training code to properly convert and shard the params.
-        loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)
-        # Add all missing LoRA weights.
-        return _merge_params(loaded_params, params, missing_regex=".*lora.*")
+    def load(self, params: at.Params) -> at.Params:  
+        loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)  
+          
+        # If skip_regex is provided, filter out matching keys  
+        if self.skip_regex:  
+            import re  
+            pattern = re.compile(self.skip_regex)  
+            flat_loaded = flax.traverse_util.flatten_dict(loaded_params, sep="/")  
+            flat_loaded = {k: v for k, v in flat_loaded.items() if not pattern.fullmatch(k)}  
+            loaded_params = flax.traverse_util.unflatten_dict(flat_loaded, sep="/")  
+          
+        return _merge_params(loaded_params, params, missing_regex=".*lora.*|.*action_(in|out)_proj.*")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -62,15 +70,12 @@ class PaliGemmaWeightLoader(WeightLoader):
     This allows us to support the action expert which is used by the Pi0 model.
     """
 
-    def load(self, params: at.Params) -> at.Params:
-        path = download.maybe_download(
-            "gs://vertex-model-garden-paligemma-us/paligemma/pt_224.npz", gs={"token": "anon"}
-        )
-        with path.open("rb") as f:
-            flat_params = dict(np.load(f, allow_pickle=False))
-        loaded_params = {"PaliGemma": flax.traverse_util.unflatten_dict(flat_params, sep="/")["params"]}
-        # Add all missing weights.
-        return _merge_params(loaded_params, params, missing_regex=".*")
+def load(self, params: at.Params) -> at.Params:    
+    loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)    
+      
+    # Don't filter here - let _merge_params handle it  
+    # Just pass the full loaded_params and update missing_regex  
+    return _merge_params(loaded_params, params, missing_regex=".*lora.*|.*action_(in|out)_proj.*|.*state_proj.*")
 
 
 def _merge_params(loaded_params: at.Params, params: at.Params, *, missing_regex: str) -> at.Params:

@@ -625,7 +625,7 @@ _CONFIGS = [
         # Don't reload existing stats since your action dimension differs from standard ALOHA  
         default_prompt="pick and place",  # Optional: your default task instruction  
     ),  
-    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),  
+    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params", skip_regex=".*action_(in|out)_proj.*|.*state_proj.*"),  
     num_train_steps=20_000,  
     batch_size=128,  
 ),
