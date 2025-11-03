@@ -613,7 +613,7 @@ _CONFIGS = [
     #
     TrainConfig(  
     name="pi0_xtrainer",  
-    model=pi0_config.Pi0Config(action_dim=32, paligemma_variant="gemma_2b_lora",action_expert_variant="gemma_300m_lora"), 
+    model=pi0_config.Pi0Config(action_dim=14, paligemma_variant="gemma_2b_lora",action_expert_variant="gemma_300m_lora"), 
     freeze_filter=pi0_config.Pi0Config(  
         paligemma_variant="gemma_2b_lora",   
         action_expert_variant="gemma_300m_lora"  
