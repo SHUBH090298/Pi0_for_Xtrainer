@@ -556,7 +556,7 @@ class TrainConfig:
     batch_size: int = 32
     # Number of workers to use for the data loader. Increasing this number will speed up data loading but
     # will increase memory and CPU usage.
-    num_workers: int = 2
+    num_workers: int = 64
     # Number of train steps (batches) to run.
     num_train_steps: int = 30_000
 
@@ -613,22 +613,24 @@ _CONFIGS = [
     #
     TrainConfig(  
     name="pi0_xtrainer",  
-    model=pi0_config.Pi0Config(action_dim=14, paligemma_variant="gemma_2b_lora",action_expert_variant="gemma_300m_lora"), 
+    model=pi0_config.Pi0Config(action_dim=32, paligemma_variant="gemma_2b_lora",action_expert_variant="gemma_300m_lora"), 
     freeze_filter=pi0_config.Pi0Config(  
         paligemma_variant="gemma_2b_lora",   
         action_expert_variant="gemma_300m_lora"  
     ).get_freeze_filter(),  
     ema_decay=None,   
     data=XtrainerDataConfig(  
-        repo_id="Shubh0902/Pick_Place2",  # Replace with your HuggingFace dataset  
+        repo_id="Shubh0902/Pick_Place2",
+                  # Asset ID for 14-dim robot  
+      # Replace with your HuggingFace dataset  
         # Compute fresh normalization stats for your 14-dim action space  
         # Don't reload existing stats since your action dimension differs from standard ALOHA  
-        default_prompt="pick and place",  # Optional: your default task instruction  
-    ),  
-    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params", skip_regex=".*action_(in|out)_proj.*|.*state_proj.*"),  
-    num_train_steps=20_000,  
+        default_prompt="pick and place"),  # Optional: your default task instruction  
+      
+    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),  
+    num_train_steps=10_000,  
     batch_size=128,  
-),
+    ),
     TrainConfig(
         name="pi0_aloha",
         model=pi0_config.Pi0Config(),
